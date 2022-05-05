@@ -48,6 +48,12 @@ contract ContractTest is DSTest, ERC721Recipient {
     address internal alice;
     address internal bob;
 
+    event ApprovalForAll(
+        address indexed owner,
+        address indexed operator,
+        bool approved
+    );
+
     function setUp() public {
         utils = new Utilities();
         users = utils.createUsers(5);
@@ -155,5 +161,64 @@ contract ContractTest is DSTest, ERC721Recipient {
         assertEq(nftToken.ownerOf(0), address(this));
         assertEq(nftToken.ownerOf(1), alice);
         assertEq(nftToken.ownerOf(3), bob);
+    }
+
+    function test_ownerOfFailed() public {
+        vm.expectRevert(
+            abi.encodeWithSignature("OwnerQueryForNonexistentToken()")
+        );
+
+        nftToken.ownerOf(42);
+    }
+
+    function test_approve() public {
+        nftToken.safeMint(address(this), 1);
+        nftToken.approve(bob, 0);
+        address approval = nftToken.getApproved(0);
+
+        assertEq(approval, bob);
+    }
+
+    function test_approveFailedCurrentOwner() public {
+        nftToken.safeMint(address(this), 1);
+        vm.expectRevert(abi.encodeWithSignature("ApprovalToCurrentOwner()"));
+        nftToken.approve(address(this), 0);
+    }
+
+    function test_approveFailedUnapprovedCaller() public {
+        nftToken.safeMint(address(this), 1);
+        nftToken.safeMint(alice, 1);
+
+        vm.expectRevert(
+            abi.encodeWithSignature("ApprovalCallerNotOwnerNorApproved()")
+        );
+        nftToken.approve(bob, 1);
+    }
+
+    function test_approveFailedNonExistentToken() public {
+        vm.expectRevert(
+            abi.encodeWithSignature("ApprovalQueryForNonexistentToken()")
+        );
+        nftToken.getApproved(111);
+    }
+
+    function test_setApprovalForAll() public {
+        nftToken.safeMint(address(this), 1);
+
+        vm.expectEmit(true, true, false, true);
+        emit ApprovalForAll(address(this), alice, true);
+
+        nftToken.setApprovalForAll(alice, true);
+
+        // We emit the event we expect to see.
+        assertTrue(nftToken.isApprovedForAll(address(this), alice));
+    }
+
+    function test_setApprovalFailed() public {
+        nftToken.safeMint(address(this), 1);
+
+        vm.expectRevert(abi.encodeWithSignature("ApproveToCaller()"));
+
+        nftToken.setApprovalForAll(address(this), true);
     }
 }
