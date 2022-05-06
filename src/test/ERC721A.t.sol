@@ -22,6 +22,14 @@ contract ERC721Recipient is ERC721TokenReceiver {
     uint256 public id;
     bytes public data;
 
+    event Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes data,
+        uint256 gas
+    );
+
     function onERC721Received(
         address _operator,
         address _from,
@@ -32,6 +40,8 @@ contract ERC721Recipient is ERC721TokenReceiver {
         from = _from;
         id = _id;
         data = _data;
+
+        emit Received(operator, from, id, data, gasleft());
 
         return ERC721TokenReceiver.onERC721Received.selector;
     }
@@ -52,6 +62,18 @@ contract ContractTest is DSTest, ERC721Recipient {
         address indexed owner,
         address indexed operator,
         bool approved
+    );
+
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 indexed id
+    );
+
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 indexed id
     );
 
     function setUp() public {
@@ -220,5 +242,52 @@ contract ContractTest is DSTest, ERC721Recipient {
         vm.expectRevert(abi.encodeWithSignature("ApproveToCaller()"));
 
         nftToken.setApprovalForAll(address(this), true);
+    }
+
+    function test_transferToGivenAddress() public {
+        nftToken.safeMint(address(this), 1);
+
+        vm.expectEmit(true, true, false, true);
+        emit Transfer(address(this), alice, 0);
+        nftToken.transferFrom(address(this), alice, 0);
+
+        assertEq(nftToken.ownerOf(0), alice);
+        assertEq(nftToken.balanceOf(address(this)), 0);
+        assertEq(nftToken.balanceOf(alice), 1);
+    }
+
+    function test_clearApprovalAfterTransfer() public {
+        nftToken.safeMint(address(this), 1);
+
+        vm.expectEmit(true, true, false, true);
+        emit Approval(address(this), address(0), 0);
+        nftToken.transferFrom(address(this), alice, 0);
+
+        assertEq(nftToken.getApproved(0), address(0));
+    }
+
+    function test_failedUnapprovedTransfer() public {
+        nftToken.safeMint(alice, 1);
+
+        vm.expectRevert(
+            abi.encodeWithSignature("TransferCallerNotOwnerNorApproved()")
+        );
+        nftToken.transferFrom(alice, bob, 0);
+    }
+
+    function test_failedNonOwnerTransfer() public {
+        nftToken.safeMint(alice, 1);
+
+        vm.expectRevert(
+            abi.encodeWithSignature("TransferFromIncorrectOwner()")
+        );
+        nftToken.transferFrom(address(this), bob, 0);
+    }
+
+    function test_failedTransferToZeroAddress() public {
+        nftToken.safeMint(address(this), 1);
+
+        vm.expectRevert(abi.encodeWithSignature("TransferToZeroAddress()"));
+        nftToken.transferFrom(address(this), address(0), 0);
     }
 }
