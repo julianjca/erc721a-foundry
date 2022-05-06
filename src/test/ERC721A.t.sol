@@ -290,4 +290,102 @@ contract ContractTest is DSTest, ERC721Recipient {
         vm.expectRevert(abi.encodeWithSignature("TransferToZeroAddress()"));
         nftToken.transferFrom(address(this), address(0), 0);
     }
+
+    function test_Burn() public {
+        nftToken.safeMint(address(this), 1);
+
+        nftToken.burn(0, false);
+        assertTrue(!nftToken.exists(0));
+    }
+
+    function test_BurnNotApproved() public {
+        nftToken.safeMint(address(this), 1);
+
+        vm.prank(bob);
+        vm.expectRevert(
+            abi.encodeWithSignature("TransferCallerNotOwnerNorApproved()")
+        );
+        nftToken.burn(0, true);
+    }
+
+    function test_safeMintSingleToken() public {
+        vm.expectEmit(true, true, false, true);
+        emit Transfer(address(0), address(this), 0);
+
+        nftToken.safeMint(address(this), 1);
+
+        assertEq(nftToken.ownerOf(0), address(this));
+        assertEq(nftToken.balanceOf(address(this)), 1);
+    }
+
+    function test_safeMintMultipleToken() public {
+        for (uint256 index = 0; index < 5; index++) {
+            vm.expectEmit(true, true, false, true);
+            emit Transfer(address(0), address(this), index);
+        }
+
+        nftToken.safeMint(address(this), 5);
+
+        for (uint256 index = 0; index < 5; index++) {
+            assertEq(nftToken.ownerOf(index), address(this));
+        }
+        assertEq(nftToken.balanceOf(address(this)), 5);
+    }
+
+    function test_safeMintToZeroAddress() public {
+        vm.expectRevert(abi.encodeWithSignature("MintToZeroAddress()"));
+        nftToken.safeMint(address(0), 5);
+    }
+
+    function test_safeMintToZeroQuantity() public {
+        vm.expectRevert(abi.encodeWithSignature("MintZeroQuantity()"));
+        nftToken.safeMint(address(1), 0);
+    }
+
+    function test_safeMintToNonReceiver() public {
+        vm.expectRevert(
+            abi.encodeWithSignature("TransferToNonERC721ReceiverImplementer()")
+        );
+        nftToken.safeMint(address(nftToken), 1);
+    }
+
+    function test_mintSingleToken() public {
+        vm.expectEmit(true, true, false, true);
+        emit Transfer(address(0), address(this), 0);
+
+        nftToken.mint(address(this), 1);
+
+        assertEq(nftToken.ownerOf(0), address(this));
+        assertEq(nftToken.balanceOf(address(this)), 1);
+    }
+
+    function test_mintMultipleToken() public {
+        for (uint256 index = 0; index < 5; index++) {
+            vm.expectEmit(true, true, false, true);
+            emit Transfer(address(0), address(this), index);
+        }
+
+        nftToken.mint(address(this), 5);
+
+        for (uint256 index = 0; index < 5; index++) {
+            assertEq(nftToken.ownerOf(index), address(this));
+        }
+        assertEq(nftToken.balanceOf(address(this)), 5);
+    }
+
+    function test_mintToZeroAddress() public {
+        vm.expectRevert(abi.encodeWithSignature("MintToZeroAddress()"));
+        nftToken.mint(address(0), 5);
+    }
+
+    function test_mintToZeroQuantity() public {
+        vm.expectRevert(abi.encodeWithSignature("MintZeroQuantity()"));
+        nftToken.mint(address(1), 0);
+    }
+
+    function test_mintToNonReceiver() public {
+        nftToken.mint(address(nftToken), 1);
+        assertEq(nftToken.ownerOf(0), address(nftToken));
+        assertEq(nftToken.balanceOf(address(nftToken)), 1);
+    }
 }
